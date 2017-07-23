@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Web;
@@ -9,6 +10,7 @@ using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin.Security;
 using InvisibleReCAPTCHA.Models;
+using Newtonsoft.Json;
 
 namespace InvisibleReCAPTCHA.Controllers
 {
@@ -151,6 +153,30 @@ namespace InvisibleReCAPTCHA.Controllers
         {
             if (ModelState.IsValid)
             {
+                try
+                {
+                    using (WebClient client = new WebClient())
+                    {
+                        var response =
+                            client.DownloadString(
+                                string.Format("https://www.google.com/recaptcha/api/siteverify?secret={0}&response={1}",
+                                    "6Lf_UBgUAAAAAGHsBD8306dRAc6gHmzSR1HEUTqe", Request.Params["g-Recaptcha-Response"]));
+
+                        ReCaptchaResult reCaptchaResult = JsonConvert.DeserializeObject<ReCaptchaResult>(response);
+
+                        if (!reCaptchaResult.Success)
+                        {
+                            ModelState.AddModelError("reCaptcha", "Bot olmadığınızı kanıtlayın.");
+                            return View(model);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    ModelState.AddModelError("reCaptcha", exception);
+                    return View(model);
+                }
+
                 var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
                 var result = await UserManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
